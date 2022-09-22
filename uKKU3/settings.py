@@ -9,23 +9,91 @@ https://docs.djangoproject.com/en/4.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
-
+from datetime import datetime
 from pathlib import Path
+import environ
+import os
+import sys
+
+###########################################################################
+## some usefull functions
+def namecheap_error_file_print(msg):
+    current_time = datetime.now().strftime("%d-%m-%Y  %H:%M:%S")
+    print(f'[{current_time}] -- {msg}', file=sys.stderr)
+
+
+def createDir(dirname):
+    try:
+        os.makedirs(dirname)
+        return True
+    except FileExistsError:
+        return False
+
+
+###########################################################################
+
+namecheap_error_file_print('------------------------------------------')
+namecheap_error_file_print('Application is starting ...')
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+namecheap_error_file_print(f'The BASE_DIR ---> {BASE_DIR}')
+VAR_DIR = os.path.join(BASE_DIR , 'var')
+namecheap_error_file_print(f'The VAR_DIR ---> {VAR_DIR}')
+if createDir(VAR_DIR):
+    namecheap_error_file_print(f'The VAR_DIR was correctly created.')
+
+########### preaparting the configuration loader from the env file
+# Take environment variables from .env file
+env = environ.Env()
+env_config_file = os.path.join(BASE_DIR, 'var', 'env')
+DEVELOPMENT_MODE = False
+if os.path.exists(env_config_file):
+    DEVELOPMENT_MODE = False
+    namecheap_error_file_print(f'loading the server environment configuration from ---> {env_config_file}.')
+    env.read_env(env_config_file)
+else:
+    DEVELOPMENT_MODE = True
+    namecheap_error_file_print(
+        f'loading the server environment configuration from default values. (since the file {env_config_file} does not exist).')
+    env = environ.Env(
+        PRODUCTION_MODE=(bool, False),
+        DEBUG=(bool, True),
+        SECRET_KEY=(str, 'django-insecure-24-0u)qh1_vsg(ebensb0xfn(n-8q&_4-im9ndk72xanc+y7k7m9ndk72xanc'),
+        SERVER_NAME=(str, '127.0.0.1'),
+        DATABASE_URL=(str, 'sqlite:///var/db.sqlite3'),
+        SITE_RESOURCES_DIR=(str, 'var/'),
+        FILE_UPLOAD_MAX_MEMORY_SIZE=(int, 104857600),  # 100Mo
+        SESSION_EXPIRE_AT_BROWSER_CLOSE=(bool, False),
+        SESSION_COOKIE_AGE=(int, 3600),
+        SESSION_COOKIE_SECURE=(bool, False),
+        CSRF_COOKIE_SECURE=(bool, False),
+        SECURE_SSL_REDIRECT=(bool, False),
+        SECURE_HSTS_SECONDS=(int, 2592000),
+        SECURE_HSTS_INCLUDE_SUBDOMAINS=(bool, False),
+        SECURE_HSTS_PRELOAD=(bool, False),
+        SITE_ADMIN_SITE_TITLE=(str, 'uKKU3 Quality Document Manager'),
+        SITE_ADMIN_SITE_HEADER=(str, 'uKKU (ver.3) Admin'),
+        SITE_ADMIN_SITE_INDEX_TITLE=(str, 'Welcome to uKKU3 Admin'),
+    )
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-^s$9cio85rp+zh4io!to$hijd)ks6s^vxtt()2p0y39rfp!8u9'
+SECRET_KEY = 'django-insecure-y*-^zlk7$l49@%(u!=-_xk-cm)^p707r364^(suarw(-7#e*a4'
+namecheap_error_file_print(f'The SECRET_KEY is {SECRET_KEY}')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env('DEBUG')
+namecheap_error_file_print(f'The DEBUG MODE is {DEBUG}')
 
-ALLOWED_HOSTS = ['*']
+PRODUCTION_MODE= env('PRODUCTION_MODE')
+namecheap_error_file_print(f'The PRODUCTION_MODE is {PRODUCTION_MODE}')
+
+ALLOWED_HOSTS = ['localhost', env('SERVER_NAME')]
+namecheap_error_file_print(f'The ALLOWED_HOSTS list is {ALLOWED_HOSTS}')
 
 
 # Application definition
@@ -75,11 +143,18 @@ WSGI_APPLICATION = 'uKKU3.wsgi.application'
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env.db('DATABASE_URL'),
 }
+
+if DATABASES['default']['ENGINE'] == 'django.db.backends.mysql':
+    DATABASES['default']['OPTIONS'] = {
+        'init_command': "SET sql_mode='STRICT_TRANS_TABLES', innodb_strict_mode=1",
+        'charset': 'utf8mb4',
+        "autocommit": True,
+    }
+    namecheap_error_file_print(f'The DATABASES engine is MYSQL, then update the options.')
+
+namecheap_error_file_print(f'The DATABASES ---> {DATABASES}')
 
 
 # Password validation
@@ -105,18 +180,54 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
 LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
+TIME_ZONE = 'Asia/Riyadh'
 USE_I18N = True
-
+USE_L10N = True
 USE_TZ = True
+
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
-STATIC_URL = 'static/'
+SITE_RESOURCES_DIR = env('SITE_RESOURCES_DIR')
+createDir(os.path.join(BASE_DIR, 'static/'))
+createDir(os.path.join(SITE_RESOURCES_DIR, 'static/'))
+createDir(os.path.join(SITE_RESOURCES_DIR, 'media/'))
+STATIC_ROOT = os.path.join(SITE_RESOURCES_DIR, 'static/')
+STATIC_URL = '/static/'
+STATICFILES_DIRS = (os.path.join(BASE_DIR, 'static/'),)
+MEDIA_ROOT = os.path.join(SITE_RESOURCES_DIR, 'media/')
+MEDIA_URL = '/media/'
+namecheap_error_file_print(f'[DIR] the static files are in {STATIC_ROOT}')
+namecheap_error_file_print(f'[DIR] the media files are in {MEDIA_ROOT}')
+
+###### allow upload big file
+FILE_UPLOAD_MAX_MEMORY_SIZE = env.int('FILE_UPLOAD_MAX_MEMORY_SIZE')
+namecheap_error_file_print(f'[FILES] the maximum size for file upload is {FILE_UPLOAD_MAX_MEMORY_SIZE / (1024 * 1024)} MBytes.')
+
+
+
+##### Admin Title configuration
+ADMIN_SITE_SITE_HEADER = env.str('SITE_ADMIN_SITE_HEADER')
+ADMIN_SITE_INDEX_TITLE = env.str('SITE_ADMIN_SITE_INDEX_TITLE')
+ADMIN_SITE_SITE_TITLE = env.str('SITE_ADMIN_SITE_TITLE')
+
+if PRODUCTION_MODE:
+    ###### Session management. The session will close after
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = env.bool('SESSION_EXPIRE_AT_BROWSER_CLOSE')
+    SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE')
+
+    ###### SSL Session
+    SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE')
+    CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE')
+    SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT')
+
+    SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS')
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS')
+    SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD')
+
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
